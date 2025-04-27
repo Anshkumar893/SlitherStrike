@@ -1,97 +1,61 @@
-import java.awt.*; // Game window and UI components library
-import javax.swing.*; // Layout management library
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionListener;
 
-public class GameFrame extends JFrame { // GameFrame uses javax.swing to create a new window
-    private CardLayout cardLayout;
-    private JPanel mainPanel;
-    private MainMenuPanel mainMenu;
-    private LevelSelectionPanel levelSelection;
-    private DifficultySelectionPanel difficultySelection;
-    private GamePanel gamePanel;  // GamePanel object
-    private ScorePanel scorePanel;
-    private int currentLevel = 1;
-    private int currentDifficulty = 0;
-    private int selectedLevel;
-
+public class GameFrame extends JFrame {
+    private GamePanel gamePanel;
+    private MainMenuPanel mainMenuPanel;
+    private LevelSelectionPanel levelSelectionPanel;
+    private DifficultySelectionPanel difficultySelectionPanel;
+    
     public GameFrame() {
-        setTitle("Slither Strike");
+        // Initialize the panels
+        gamePanel = new GamePanel();
+        mainMenuPanel = new MainMenuPanel(this);
+        levelSelectionPanel = new LevelSelectionPanel(this);
+        difficultySelectionPanel = new DifficultySelectionPanel(this);
+
+        // Set the layout manager to CardLayout, so we can switch between panels
+        setLayout(new CardLayout());
+
+        // Add panels to the card layout
+        add(mainMenuPanel, "MAIN_MENU");
+        add(levelSelectionPanel, "LEVEL_SELECTION");
+        add(difficultySelectionPanel, "DIFFICULTY_SELECTION");
+        add(gamePanel, "GAME_PANEL");
+
+        // Set up frame properties
+        setTitle("Snake Game");
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
-        setResizable(false);
 
-        cardLayout = new CardLayout(); // Used to switch between screens
-        mainPanel = new JPanel(cardLayout); // Memory allocation for UI components
-
-        // Initializing all panels
-        mainMenu = new MainMenuPanel(this);
-        levelSelection = new LevelSelectionPanel(this);
-        difficultySelection = new DifficultySelectionPanel(this);
-        gamePanel = new GamePanel(this);  // Initialize GamePanel
-        scorePanel = new ScorePanel(this);
-
-        // Adding the panels to the main screen with card layout
-        mainPanel.add(mainMenu, "MENU");
-        mainPanel.add(levelSelection, "LEVELS");
-        mainPanel.add(difficultySelection, "DIFFICULTY");
-        mainPanel.add(gamePanel, "GAME");
-        mainPanel.add(scorePanel, "SCORES");
-
-        add(mainPanel);
-        showScreen("MENU");  // Show the main menu initially
+        // Show the main menu by default
+        showScreen("MAIN_MENU");
     }
 
-    // Screen switching functionality using CardLayout
+    // Method to show a specific screen based on its name
     public void showScreen(String screenName) {
-        cardLayout.show(mainPanel, screenName);
-        if (screenName.equals("GAME")) {
-            gamePanel.requestFocusInWindow();  // Ensure keyboard input goes to the game panel
-        }
+        CardLayout cardLayout = (CardLayout) getContentPane().getLayout();
+        cardLayout.show(getContentPane(), screenName);
     }
 
-    // Display the level selection screen
-    public void showLevelScreen() {
-        showScreen("LEVELS");
+    // This method will be called when a level is selected
+    public void onLevelSelected(Level selectedLevel) {
+        // Switch to difficulty selection screen
+        showScreen("DIFFICULTY_SELECTION");
+
+        // Set listener for difficulty selection
+        difficultySelectionPanel.setOnDifficultySelectedListener(e -> {
+            // Get selected difficulty and start the game
+            Difficulty selectedDifficulty = Difficulty.valueOf(e.getActionCommand());
+            startSelectedGame(selectedLevel, selectedDifficulty);
+        });
     }
 
-    // Display the difficulty selection screen
-    public void showDifficultyScreen(int level) {
-        this.selectedLevel = level;  // Store the selected level
-        difficultySelection.updateLevel(level);  // Update the difficulty panel with the selected level
-        showScreen("DIFFICULTY");
-    }
-
-    // Start the game with the chosen level and difficulty
-    public void startGame() {
-        gamePanel.startGame(currentLevel, currentDifficulty);  // Start the game with the current level and difficulty
-        showScreen("GAME");  // Show the game screen
-    }
-
-    // Start the game using the selected level and difficulty passed as parameters (over loading)
-    public void startGame(int currentLevel, int currentDifficulty) {
-        this.currentLevel = currentLevel;  // Set the current level
-        this.currentDifficulty = currentDifficulty;  // Set the current difficulty
-        gamePanel.startGame(currentLevel, currentDifficulty);  // Start the game with the provided parameters
-        showScreen("GAME");  // Show the game screen
-    }
-
-    // Set the current difficulty level for the game
-    public void setCurrentDifficulty(int difficulty) {
-        this.currentDifficulty = difficulty;  // Set the difficulty
-    }
-
-    // Get the current selected level
-    public int getCurrentLevel() {
-        return currentLevel;  // Return the current level
-    }
-
-    // Get the current difficulty level
-    public int getCurrentDifficulty() {
-        return currentDifficulty;  // Return the current difficulty
-    }
-
-    // Getter method to access the GamePanel from other classes
-    public GamePanel getGamePanel() {
-        return gamePanel;  // Return the instance of GamePanel
+    // This method will be called to start the game with the selected level and difficulty
+    public void startSelectedGame(Level selectedLevel, Difficulty selectedDifficulty) {
+        gamePanel.startGame(selectedLevel, selectedDifficulty);
+        showScreen("GAME_PANEL");
     }
 }

@@ -1,276 +1,205 @@
-import java.awt.*;
-import java.awt.event.*;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.Random;
 import javax.swing.*;
+import java.awt.event.*;
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 
-public class GamePanel extends JPanel implements ActionListener {
-    private static final int TILE_SIZE = 20;  // Size of each tile (snake and food)
-    private static final int WIDTH = 800;     // Width of the game area
-    private static final int HEIGHT = 600;    // Height of the game area
-    private boolean snakeInvisible = false;  // Flag to track if the snake is invisible
+public class GamePanel extends JPanel {
+    private List<Obstacle> obstacles;
+    private List<Food> foodItems;
 
-    private LinkedList<Point> snake;         // Linked list to store the snake's body
-    private Point food;                      // Point to store the current food position
-    private Point direction;                 // Direction in which the snake is moving
-    private Point nextDirection;             // Next direction for the snake movement
-    private Timer gameTimer;                 // Timer for the game loop (javax.swing.Timer)
-    private Random random;                   // Random number generator for food and obstacle placement
-    private boolean isRunning;               // Flag to check if the game is running
-    private int score;                       // Current score of the game
-    private int currentLevel;                // Current level of the game
-    private int currentDifficulty;           // Current difficulty level
-    private GameFrame frame;                 // Game frame reference
-    private ArrayList<Point> obstacles;      // List to store obstacle positions
+    private int snakeX, snakeY; // Snake's current position
+    private int snakeSpeed;
+    private int snakeLength; // Snake length
+    private List<Point> snakeBody; // To track the snake's body (for collision detection)
 
-    private Timer invisibilityTimer;         // Timer for invisibility mode (javax.swing.Timer)
-    private boolean isInvisible = false;     // Flag to toggle invisibility every 15 seconds
+    private boolean gameOver;
 
-    public GamePanel(GameFrame frame) {
-        this.frame = frame;
-        setPreferredSize(new Dimension(WIDTH, HEIGHT));  // Set panel size
-        setBackground(Color.BLACK);  // Set background color
-        setFocusable(true);  // Enable panel to receive keyboard input
+    private Level currentLevel; // Current level being played
+    private Difficulty currentDifficulty; // Current difficulty
 
-        snake = new LinkedList<>();  // Initialize the snake's body as a linked list
-        direction = new Point(TILE_SIZE, 0);  // Initially, the snake will move to the right
-        nextDirection = new Point(TILE_SIZE, 0);  // The next direction for movement is also to the right
-        random = new Random();  // Random number generator for food and obstacles
-        obstacles = new ArrayList<>();  // List to store obstacle points
-        isRunning = false;  // Game is initially not running
-        score = 0;  // Initialize score to 0
+    public GamePanel() {
+        this.obstacles = new ArrayList<>();
+        this.foodItems = new ArrayList<>();
+        this.snakeBody = new ArrayList<>();
+        this.gameOver = false;
 
-        addKeyListener(new GameKeyListener());  // Add a key listener for controlling the snake
+        // Set up key listener for movement control
+        setKeyListener();
+    }
 
-        // Initialize Timer for the invisibility mode (javax.swing.Timer)
-        invisibilityTimer = new Timer(15000, new ActionListener() {
+    // Start the game with the selected level and difficulty
+    public void startGame(Level level, Difficulty difficulty) {
+        // Reset game state
+        this.snakeX = 100;
+        this.snakeY = 100;
+        this.snakeSpeed = difficulty.getSnakeSpeed();
+        this.snakeLength = 1;
+        this.snakeBody.clear();
+        this.snakeBody.add(new Point(snakeX, snakeY));
+        this.gameOver = false;
+
+        // Set the current level and difficulty
+        this.currentLevel = level;
+        this.currentDifficulty = difficulty;
+
+        // Apply level rules for obstacles, food, and speed
+        level.applyLevelRules(this);
+
+        // Repaint the game panel to display the initial game state
+        repaint();
+    }
+
+    // Spawn obstacles based on the difficulty
+    public void setObstacles(int count) {
+        obstacles.clear(); // Clear existing obstacles
+        for (int i = 0; i < count; i++) {
+            // Spawn an obstacle
+            Obstacle obstacle = new Obstacle();
+            obstacles.add(obstacle);
+        }
+    }
+
+    // Set snake speed based on difficulty
+    public void setSnakeSpeed(int speed) {
+        this.snakeSpeed = speed;
+        // You can use this to adjust the speed of the snake in your game logic
+    }
+
+    // Spawn food items based on the difficulty and level
+    public void setFoodItems() {
+        foodItems.clear(); // Clear existing food items
+        for (int i = 0; i < 5; i++) {  // Example: spawn 5 food items
+            Food food = new Food("normal"); // Example: spawn normal food
+            foodItems.add(food);
+        }
+    }
+
+    // Set up key listener for snake movement
+    private void setKeyListener() {
+        this.addKeyListener(new KeyAdapter() {
             @Override
-            public void actionPerformed(ActionEvent e) {
-                // Toggle invisibility every 15 seconds
-                isInvisible = !isInvisible;
-                setSnakeInvisible(isInvisible);  // Call the method to toggle snake visibility
-
-                // Log the invisibility toggle for debugging
-                if (isInvisible) {
-                    System.out.println("Snake is now invisible!");
-                } else {
-                    System.out.println("Snake is visible again.");
+            public void keyPressed(KeyEvent e) {
+                if (gameOver) {
+                    return;  // Don't allow movement when the game is over
+                }
+                // Movement keys
+                switch (e.getKeyCode()) {
+                    case KeyEvent.VK_UP:
+                        moveSnake(0, -snakeSpeed);
+                        break;
+                    case KeyEvent.VK_DOWN:
+                        moveSnake(0, snakeSpeed);
+                        break;
+                    case KeyEvent.VK_LEFT:
+                        moveSnake(-snakeSpeed, 0);
+                        break;
+                    case KeyEvent.VK_RIGHT:
+                        moveSnake(snakeSpeed, 0);
+                        break;
+                    case KeyEvent.VK_R: // Restart game if game over
+                        if (gameOver) {
+                            restartGame();
+                        }
+                        break;
                 }
             }
         });
-        invisibilityTimer.setInitialDelay(0);  // Set initial delay to 0 for immediate start
+        this.setFocusable(true);  // Enable key events
     }
 
-    // Start the game with chosen level and difficulty
-    public void startGame(int level, int difficulty) {
-        this.currentLevel = level;  // Set the current level
-        this.currentDifficulty = difficulty;  // Set the current difficulty
-        initGame();  // Initialize the game state
-
-        // Adjust speed based on the level and difficulty
-        int speed = 200 - (level * 10) - (difficulty * 30);
-        int obstacleCount = level + (difficulty * 2);
-
-        // Stop any existing game timer
-        if (gameTimer != null) {
-            gameTimer.stop();  // Stop the existing game timer
-        }
-
-        // Create and start a new game timer (javax.swing.Timer)
-        gameTimer = new Timer(speed, this);  // 'this' refers to ActionListener (GamePanel)
-        gameTimer.start();  // Start the timer
-
-        isRunning = true;  // Set the game as running
-        requestFocusInWindow();  // Request focus for the panel to receive keyboard inputs
-
-        // Start the invisibility timer to toggle invisibility every 15 seconds
-        invisibilityTimer.start();
-    }
-
-    // Initialize or restart the game
-    private void initGame() {
-        snake.clear();  // Clear previous snake data
-        obstacles.clear();  // Clear obstacles
-        snake.add(new Point(WIDTH / 2, HEIGHT / 2));  // Set the snake's starting position at the center
-        spawnFood();  // Spawn the initial food
-        direction.setLocation(TILE_SIZE, 0);  // Set initial movement direction (right)
-        nextDirection.setLocation(TILE_SIZE, 0);  // Set the next direction to right as well
-        score = 0;  // Reset the score
-        isRunning = true;  // Set game to running state
-    }
-
-    // Generate random obstacles in the game area
-    private void generateObstacles(int count) {
-        obstacles.clear();  // Clear previous obstacles
-        for (int i = 0; i < count; i++) {
-            int x, y;
-            do {
-                // Generate random x and y positions for obstacles
-                x = random.nextInt(WIDTH / TILE_SIZE) * TILE_SIZE;
-                y = random.nextInt(HEIGHT / TILE_SIZE) * TILE_SIZE;
-            } while (snake.contains(new Point(x, y)) || (food != null && x == food.x && y == food.y));  // Ensure obstacles don't overlap snake or food
-
-            obstacles.add(new Point(x, y));  // Add the new obstacle to the list
-        }
-    }
-
-    // Spawn food at a random location on the screen
-    private void spawnFood() {
-        int x, y;
-        do {
-            // Generate random x and y positions for the food
-            x = random.nextInt(WIDTH / TILE_SIZE) * TILE_SIZE;
-            y = random.nextInt(HEIGHT / TILE_SIZE) * TILE_SIZE;
-        } while (snake.contains(new Point(x, y)) || isObstacle(x, y));  // Ensure food doesn't overlap snake or obstacles
-
-        food = new Point(x, y);  // Set the food position
-    }
-
-    // Check if a given position is occupied by an obstacle
-    private boolean isObstacle(int x, int y) {
-        for (Point obs : obstacles) {
-            if (obs.x == x && obs.y == y) return true;  // If position matches an obstacle, return true
-        }
-        return false;  // Return false if no obstacle at the given position
-    }
-
-    // Set the snake to be invisible or visible
-    public void setSnakeInvisible(boolean invisible) {
-        this.snakeInvisible = invisible;  // Set the snakeInvisible flag
-        repaint();  // Redraw the screen to apply the invisibility change
-    }
-
-    @Override
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-
-        if (!isRunning) {
-            g.setColor(Color.RED);  // Set the color for game over message
-            g.setFont(new Font("Arial", Font.BOLD, 48));  // Set font for game over message
-            g.drawString("GAME OVER", WIDTH / 2 - 150, HEIGHT / 2);  // Draw game over text
-            g.setFont(new Font("Arial", Font.PLAIN, 24));  // Set font for restart instructions
-            g.drawString("Press SPACE to restart", WIDTH / 2 - 100, HEIGHT / 2 + 40);  // Instructions to restart
+    // Move the snake
+    public void moveSnake(int dx, int dy) {
+        if (gameOver) {
             return;
         }
+        // Move the snake's head
+        int newHeadX = snakeX + dx;
+        int newHeadY = snakeY + dy;
+
+        // Move the snake body (update the body)
+        snakeBody.add(0, new Point(newHeadX, newHeadY));
+        snakeX = newHeadX;
+        snakeY = newHeadY;
+
+        // Check for collisions with food
+        checkFoodCollision();
+
+        // Check for collisions with obstacles or itself
+        checkCollisions();
+
+        // Keep the snake length the same (unless it eats food, then it grows)
+        if (snakeBody.size() > snakeLength) {
+            snakeBody.remove(snakeBody.size() - 1); // Remove the last part of the body (tail)
+        }
+
+        repaint(); // Redraw the game panel
+    }
+
+    // Check if the snake has eaten food
+    private void checkFoodCollision() {
+        for (Food food : foodItems) {
+            if (food.checkCollision(snakeX, snakeY)) {
+                // Snake eats the food, so respawn food and grow the snake
+                food.spawnFood();
+                snakeLength++;  // Increase snake length after eating food
+            }
+        }
+    }
+
+    // Check for collisions with obstacles or the snake itself
+    private void checkCollisions() {
+        // Check for collisions with obstacles
+        for (Obstacle obstacle : obstacles) {
+            if (obstacle.checkCollision(snakeX, snakeY)) {
+                // Handle collision (e.g., game over)
+                gameOver = true;
+                System.out.println("Game Over! Snake hit an obstacle.");
+            }
+        }
+
+        // Check for collisions with the snake itself
+        for (int i = 1; i < snakeBody.size(); i++) {
+            if (snakeX == snakeBody.get(i).x && snakeY == snakeBody.get(i).y) {
+                // Snake collided with itself
+                gameOver = true;
+                System.out.println("Game Over! Snake collided with itself.");
+            }
+        }
+    }
+
+    // Restart the game
+    private void restartGame() {
+        startGame(currentLevel, currentDifficulty); // Restart with the same level and difficulty
+    }
+
+    // Method to draw obstacles, food, and snake on the game panel
+    @Override
+    public void paintComponent(Graphics g) {
+        super.paintComponent(g);
 
         // Draw obstacles
-        g.setColor(new Color(139, 69, 19));  // Set obstacle color to brown
-        for (Point obs : obstacles) {
-            g.fillRect(obs.x, obs.y, TILE_SIZE, TILE_SIZE);  // Draw each obstacle
+        for (Obstacle obstacle : obstacles) {
+            obstacle.draw(g);
         }
 
         // Draw food
-        g.setColor(Color.WHITE);
-        g.fillRect(food.x, food.y, TILE_SIZE, TILE_SIZE);  // Draw food
-
-        // Draw snake based on visibility flag
-        if (!snakeInvisible) {  // If snake is visible, draw entire snake
-            g.setColor(Color.GREEN);  // Set snake color to green
-            for (Point p : snake) {
-                g.fillRect(p.x, p.y, TILE_SIZE, TILE_SIZE);  // Draw each body part of the snake
-            }
-        } else {  // If snake is invisible, only draw the head
-            Point head = snake.get(0);  // Get the snake's head
-            g.setColor(Color.GREEN);  // Set color to green for the head
-            g.fillRect(head.x, head.y, TILE_SIZE, TILE_SIZE);  // Draw only the head
+        for (Food food : foodItems) {
+            food.draw(g);
         }
 
-        // Draw the snake's head in dark green
-        if (!snake.isEmpty()) {
-            g.setColor(new Color(0, 100, 0));  // Dark green for head
-            g.fillRect(snake.getFirst().x, snake.getFirst().y, TILE_SIZE, TILE_SIZE);  // Draw head
+        // Draw the snake
+        g.setColor(Color.GREEN);
+        for (Point point : snakeBody) {
+            g.fillRect(point.x, point.y, 20, 20);  // Draw snake body
         }
 
-        // Display score, level, and difficulty
-        g.setColor(Color.WHITE);  // Set text color to white
-        g.setFont(new Font("Arial", Font.PLAIN, 20));  // Set font for score, level, etc.
-        g.drawString("Score: " + score, 10, 20);  // Draw score
-        g.drawString("Level: " + currentLevel, 10, 40);  // Draw level
-        g.drawString("Difficulty: " + getDifficultyName(), 10, 60);  // Draw difficulty level
-        g.drawString("ESC: Menu", 10, HEIGHT - 20);  // Draw escape key instruction
-    }
-
-    // Convert difficulty integer to string
-    private String getDifficultyName() {
-        switch (currentDifficulty) {
-            case 0: return "Easy";
-            case 1: return "Medium";
-            case 2: return "Hard";
-            default: return "";
-        }
-    }
-
-    @Override
-    public void actionPerformed(ActionEvent e) {
-        if (!isRunning) return;
-
-        // Update direction based on key input
-        direction.setLocation(nextDirection);
-
-        // Snake movement
-        Point head = snake.getFirst();
-        Point newHead = new Point(head.x + direction.x, head.y + direction.y);
-
-        // Wrap the snake around if it goes out of bounds
-        if (newHead.x < 0) newHead.x = WIDTH - TILE_SIZE;
-        if (newHead.x >= WIDTH) newHead.x = 0;
-        if (newHead.y < 0) newHead.y = HEIGHT - TILE_SIZE;
-        if (newHead.y >= HEIGHT) newHead.y = 0;
-
-        // Collision detection (self and obstacles)
-        if (snake.contains(newHead) || isObstacle(newHead.x, newHead.y)) {
-            gameOver();  // End game if collision occurs
-            return;
-        }
-
-        snake.addFirst(newHead);  // Add the new head
-
-        // Check if the snake eats food
-        if (newHead.equals(food)) {
-            score += 10 * (currentLevel + currentDifficulty + 1);  // Increase score
-            spawnFood();  // Spawn new food
-        } else {
-            snake.removeLast();  // Remove the tail if no food is eaten
-        }
-
-        repaint();  // Redraw the game screen
-    }
-
-    private void gameOver() {
-        isRunning = false;  // Set the game to stopped state
-        gameTimer.stop();  // Stop the game timer
-        repaint();  // Redraw to show game over message
-    }
-
-    // Key listener for controlling the snake
-    private class GameKeyListener extends KeyAdapter {
-        @Override
-        public void keyPressed(KeyEvent e) {
-            switch (e.getKeyCode()) {
-                case KeyEvent.VK_UP:
-                case KeyEvent.VK_W:
-                    if (direction.y == 0) nextDirection.setLocation(0, -TILE_SIZE);  // Move up
-                    break;
-                case KeyEvent.VK_DOWN:
-                case KeyEvent.VK_S:
-                    if (direction.y == 0) nextDirection.setLocation(0, TILE_SIZE);  // Move down
-                    break;
-                case KeyEvent.VK_LEFT:
-                case KeyEvent.VK_A:
-                    if (direction.x == 0) nextDirection.setLocation(-TILE_SIZE, 0);  // Move left
-                    break;
-                case KeyEvent.VK_RIGHT:
-                case KeyEvent.VK_D:
-                    if (direction.x == 0) nextDirection.setLocation(TILE_SIZE, 0);  // Move right
-                    break;
-                case KeyEvent.VK_ESCAPE:
-                    frame.showScreen("MENU");  // Show menu on Escape
-                    break;
-                case KeyEvent.VK_SPACE:
-                    if (!isRunning) startGame(currentLevel, currentDifficulty);  // Start/restart game
-                    break;
-            }
+        // Game Over text
+        if (gameOver) {
+            g.setColor(Color.RED);
+            g.setFont(new Font("Arial", Font.BOLD, 40));
+            g.drawString("GAME OVER", 150, 200);
+            g.drawString("Press R to Restart", 130, 250);
         }
     }
 }

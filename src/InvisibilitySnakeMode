@@ -1,0 +1,7 @@
+public class InvisibleSnakeMode {
+    public void activateInvisibleSnakeMode(GamePanel gamePanel) {
+        // Logic to activate the invisible snake mode
+        gamePanel.setSnakeInvisible(true);
+        System.out.println("Invisible Snake Mode Activated!");
+    }
+}

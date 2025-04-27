@@ -1,0 +1,18 @@
+// FreePlayLevel2.java - The second free play level
+public class FreePlayLevel2 extends Level {
+    public FreePlayLevel2(Difficulty difficulty) {
+        this.levelNumber = 2;
+        this.difficulty = difficulty;
+    }
+
+    @Override
+    public void applyLevelRules(GamePanel gamePanel) {
+        // Set the snake speed and number of obstacles based on difficulty
+        int speed = difficulty.getSnakeSpeed();
+        int numObstacles = difficulty.getObstacles();
+
+        gamePanel.setSnakeSpeed(speed);
+        gamePanel.setObstacles(numObstacles);
+        gamePanel.setFoodItems();  // Set food items for this level
+    }
+}

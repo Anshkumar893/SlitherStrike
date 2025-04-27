@@ -1,0 +1,18 @@
+// FreePlayLevel3.java - The third free play level
+public class FreePlayLevel3 extends Level {
+    public FreePlayLevel3(Difficulty difficulty) {
+        this.levelNumber = 3;
+        this.difficulty = difficulty;
+    }
+
+    @Override
+    public void applyLevelRules(GamePanel gamePanel) {
+        // Set the snake speed and number of obstacles based on difficulty
+        int speed = difficulty.getSnakeSpeed();
+        int numObstacles = difficulty.getObstacles();
+
+        gamePanel.setSnakeSpeed(speed);
+        gamePanel.setObstacles(numObstacles);
+        gamePanel.setFoodItems();  // Set food items for this level
+    }
+}

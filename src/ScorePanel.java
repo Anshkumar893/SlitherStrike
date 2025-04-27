@@ -1,26 +1,58 @@
-import java.awt.*; // Game window aur UI components ki library
-import javax.swing.*; // Layout management ki library
+import javax.swing.*;
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class ScorePanel extends JPanel {
-    public ScorePanel(GameFrame frame) {
-        setLayout(new BorderLayout());
-        setBackground(new Color(255, 228, 181));
+    private List<ScoreEntry> scoreEntries;
+    private JPanel scoreListPanel;
 
-        JLabel title = new JLabel("High Scores", JLabel.CENTER);
+    public ScorePanel() {
+        this.scoreEntries = new ArrayList<>();
+        setLayout(new BorderLayout());
+
+        JLabel title = new JLabel("Scoreboard");
         title.setFont(new Font("Arial", Font.BOLD, 24));
+        title.setHorizontalAlignment(SwingConstants.CENTER);
+        title.setForeground(Color.BLUE);
         add(title, BorderLayout.NORTH);
 
-        JTextArea scoresArea = new JTextArea();
-        scoresArea.setEditable(false);
-        scoresArea.setFont(new Font("Arial", Font.PLAIN, 18));
-        scoresArea.setText("1. Player1 - 1000\n2. Player2 - 800\n3. Player3 - 600"); // hard code kiya hua just for demonstration
-
-        JScrollPane scrollPane = new JScrollPane(scoresArea);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
+        scoreListPanel = new JPanel(new GridLayout(0, 1));
+        scoreListPanel.setOpaque(false);
+        JScrollPane scrollPane = new JScrollPane(scoreListPanel);
         add(scrollPane, BorderLayout.CENTER);
+    }
 
-        JButton backBtn = new JButton("Back to Menu");
-        backBtn.addActionListener(e -> frame.showScreen("MENU"));
-        add(backBtn, BorderLayout.SOUTH);
+    public void updateScores(List<ScoreEntry> updatedScores) {
+        scoreEntries = updatedScores;
+        scoreListPanel.removeAll();
+
+        for (ScoreEntry entry : scoreEntries) {
+            JPanel row = new JPanel(new GridLayout(1, 3));
+            row.setOpaque(false);
+
+            JLabel nameLabel = new JLabel(entry.getPlayerName());
+            nameLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+            JLabel scoreLabel = new JLabel(String.valueOf(entry.getScore()));
+            scoreLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+            JLabel modeLabel = new JLabel(entry.getGameMode());
+            modeLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+            row.add(nameLabel);
+            row.add(scoreLabel);
+            row.add(modeLabel);
+
+            scoreListPanel.add(row);
+        }
+
+        revalidate();
+        repaint();
+    }
+
+    public void addScore(ScoreEntry newEntry) {
+        scoreEntries.add(newEntry);
+        updateScores(scoreEntries);
     }
 }
